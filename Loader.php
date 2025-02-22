@@ -10,7 +10,7 @@ use RuntimeException;
  * ------------------------------------------------------------------------------------
  *
  * @package uwi-loader
- * @version 2.4.3
+ * @version 3.0.0
  * @author  Alexandr Shamanin <@slpAkkie>
  * @license MIT License
  *

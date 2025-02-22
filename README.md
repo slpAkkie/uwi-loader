@@ -18,4 +18,4 @@ Uwi\Loader\Loader::register();
 
 ## Версия
 
-`2.4.3`
+`3.0.0`
