@@ -2,124 +2,208 @@
 
 namespace Uwi\Loader;
 
+use RuntimeException;
+
 /**
- * ---------------------------------------------------------------------------
- * Реализация автозагрузки классов для платформы Uwi, соответствующая PSR-4
- * ---------------------------------------------------------------------------
+ * ------------------------------------------------------------------------------------
+ * Implementation of class autoloading for the Uwi Framework, corresponding to PSR-4
+ * ------------------------------------------------------------------------------------
  *
  * @author Alexandr Shamanin <@slpAkkie>
  * @package uwi-loader
  *
  */
-class Loader
+final class Loader
 {
     /**
-     * Имя функции, которая будет зарегистрирована, как функция автозагрузки классов
+     * The name of the method that will be registered as a class autoloading function
      *
      * @var string
      */
-    private const SPL_AUTOLOAD_FUNCTION_NAME = 'loadClass';
+    private const SPL_FUNC_NAME = 'loadClass';
 
     /**
-     * Массив префиксов и путей, по которым искать файлы для них
+     * PHP class file extension
+     *
+     * @var string
+     */
+    private const CLASS_FILE_EXT = '.php';
+
+    /**
+     * An array of aliases and route matches
      *
      * @var array
      */
-    private static array $prefixes = array();
+    private static array $aliases = array();
 
     /**
-     * Зарегистрировать автозагрузчик классов
+     * Class Constructor
+     *
+     * Made private so that you cannot create an instance of the class in order to prevent misuse.
+     */
+    private function __construct()
+    {
+        // There is no need for a constructor
+    }
+
+    /**
+     * Autoloader registration function
      *
      * @return void
-     * @throws \Uwi\Exceptions\LoaderCannotBeRegisteredException
+     * @throws TypeError
      */
     public static function register(): void
     {
-        try {
-            spl_autoload_register([self::class, self::SPL_AUTOLOAD_FUNCTION_NAME]);
-        } catch (\Throwable $e) {
-            require_once __DIR__ . '/Exceptions/LoaderCannotBeRegisteredException.php';
-            throw new Exceptions\LoaderCannotBeRegisteredException($e);
-        }
+        spl_autoload_register(
+            array(self::class, self::SPL_FUNC_NAME)
+        );
     }
 
     /**
-     * Прочитать конфигурацию для автозагрузки из JSON файла
-     * и добавить в автозагрузчик
+     * Adds a route for an alias
      *
-     * @return void
-     * @throws \Uwi\Exceptions\ConfigurationCannotBeReadException
-     * @throws \Uwi\Exceptions\JsonSchemaException
-     */
-    public static function fromJson(string $path): void
-    {
-        $path = realpath($path);
-
-        $jsonRootPath = dirname($path);
-        $jsonContent = @file_get_contents($path);
-        if ($jsonContent === false) {
-            require_once __DIR__ . '/Exceptions/ConfigurationCannotBeReadException.php';
-            throw new Exceptions\ConfigurationCannotBeReadException(error_get_last()['message']);
-        }
-
-        $parsedArray = json_decode($jsonContent, true);
-        if (is_null($parsedArray) || !is_array($parsedArray)) {
-            require_once __DIR__ . '/Exceptions/JsonSchemaException.php';
-            throw new Exceptions\JsonSchemaException('Json schema cannot be decoded');
-        }
-
-        if (!key_exists('psr-4', $parsedArray)) {
-            require_once __DIR__ . '/Exceptions/JsonSchemaException.php';
-            throw new Exceptions\JsonSchemaException('Key [psr-4] doesn\'t exists');
-        }
-
-        foreach ($parsedArray['psr-4'] as $prefix => $value) {
-            if (key_exists($prefix, self::$prefixes)) {
-                self::addPath($prefix, $value, $jsonRootPath);
-            } else {
-                self::addPrefix($prefix, $value, $jsonRootPath);
-            }
-        }
-    }
-
-    /**
-     * Добавить путь для префикса
-     *
-     * @param string $prefix
+     * @param string $alias
      * @param string $path
      * @param string $rootPath
      * @return void
      */
-    public static function addPath(string $prefix, string $path, string $rootPath = ''): void
+    private static function addAliasRoute(string $alias, string $path, string $rootPath = ''): void
     {
-        if (in_array($path, self::$prefixes[$prefix])) {
+        if (in_array($path, self::$aliases[$alias])) {
             return;
         }
 
-        self::$prefixes[$prefix][] = self::concatPath($rootPath, $path);
+        self::$aliases[$alias][] = self::concatPath($rootPath, $path);
     }
 
     /**
-     * Добавить пути для префикса
+     * Adds array of routes for an alias
      *
-     * @param string $prefix
+     * @param string $alias
      * @param array $path
      * @param string $rootPath
      * @return void
      */
-    public static function addPaths(string $prefix, array $paths, string $rootPath = ''): void
+    private static function addAliasRoutes(string $alias, array $paths, string $rootPath = ''): void
     {
-        $paths = array_filter($paths, function ($path) use ($prefix) {
-            return !in_array($path, self::$prefixes[$prefix]);
+        $paths = array_filter($paths, function ($path) use ($alias) {
+            return !in_array($path, self::$aliases[$alias]);
         });
 
-        $paths = array_map(fn ($path) => self::concatPath($rootPath, $path), $paths);
+        $paths = array_map(fn($path) => self::concatPath($rootPath, $path), $paths);
 
-        self::$prefixes[$prefix] = array_merge(self::$prefixes[$prefix], $paths);
+        self::$aliases[$alias] = array_merge(self::$aliases[$alias], $paths);
     }
 
     /**
-     * Соединяет два пути
+     * Public function for adding alias
+     *
+     * @param string $alias
+     * @param string $path
+     * @param string $rootPath
+     * @return void
+     */
+    public static function addAlias(string $alias, string|array $path, string $rootPath = ''): void
+    {
+        if (key_exists($alias, self::$aliases)) {
+            return;
+        }
+
+        self::$aliases[$alias] = array();
+
+        if (is_array($path)) {
+            self::addAliasRoutes($alias, $path, $rootPath);
+        } else {
+            self::addAliasRoute($alias, $path, $rootPath);
+        }
+    }
+
+    /**
+     * Public function for adding aliases
+     *
+     * @param array $aliases
+     * @param string $rootPath
+     * @return void
+     */
+    public static function addAliases(array $aliases, string $rootPath = ''): void
+    {
+        foreach ($aliases as $alias => $path) {
+            self::addAlias($alias, $path, $rootPath);
+        }
+    }
+
+    /**
+     * Load class according to aliases
+     *
+     * @param string $class
+     * @return void
+     */
+    public static function loadClass(string $class): void
+    {
+        foreach (self::$aliases as $alias => $paths) {
+            if (!str_starts_with($class, $alias)) {
+                continue;
+            }
+
+            foreach ($paths as $path) {
+                $classPath = self::getClassPathWithAlias($class, $alias, $path);
+
+                if (file_exists($classPath)) {
+                    @require_once $classPath;
+                    return;
+                }
+            }
+        }
+
+        $classPath = self::getClassPath($class);
+
+        if (file_exists($classPath)) {
+            @require_once $classPath;
+        }
+    }
+
+    /**
+     * Get the path to the class file according to alias path
+     *
+     * @param string $class
+     * @param string $alias
+     * @param string $path
+     * @return string
+     */
+    private static function getClassPathWithAlias(string $class, string $alias, string $path): string
+    {
+        $classPath = str_replace(
+            array($alias, '\\'),
+            array($path, '/'),
+            $class
+        );
+
+        $classPath .= self::CLASS_FILE_EXT;
+
+        return $classPath;
+    }
+
+    /**
+     * Get the path to the class file
+     *
+     * @param string $class
+     * @return string
+     */
+    private static function getClassPath(string $class): string
+    {
+        $classPath = str_replace(
+            array('\\'),
+            array('/'),
+            $class
+        );
+
+        $classPath .= self::CLASS_FILE_EXT;
+
+        return $classPath;
+    }
+
+    /**
+     * Connects two paths
      *
      * @param string $str1
      * @param string $str2
@@ -128,72 +212,5 @@ class Loader
     private static function concatPath(string $str1, string $str2): string
     {
         return rtrim($str1, '\\/') . '/' . trim($str2, '\\/');
-    }
-
-    /**
-     * Добавить префикс и пути к нему
-     *
-     * @param string $prefix
-     * @param string $path
-     * @param string $rootPath
-     * @return void
-     */
-    public static function addPrefix(string $prefix, string|array $path, string $rootPath = ''): void
-    {
-        if (key_exists($prefix, self::$prefixes)) {
-            return;
-        }
-
-        self::$prefixes[$prefix] = array();
-
-        if (is_array($path)) {
-            self::addPaths($prefix, $path, $rootPath);
-        } else {
-            self::addPath($prefix, $path, $rootPath);
-        }
-    }
-
-    /**
-     * Загрузить класс
-     *
-     * @param string $class
-     * @return void
-     */
-    public static function loadClass(string $class): void
-    {
-        foreach (self::$prefixes as $prefix => $paths) {
-            if (!str_starts_with($class, $prefix)) {
-                continue;
-            }
-
-            foreach ($paths as $path) {
-                $classPath = self::getPossibleClassPath($class, $prefix, $path);
-
-                if (file_exists($classPath)) {
-                    @require_once $classPath;
-                }
-            }
-        }
-    }
-
-    /**
-     * Собрать возможный путь до файла с классом
-     *
-     * @param string $class
-     * @param string $prefix
-     * @param string $path
-     * @return string
-     */
-    private static function getPossibleClassPath(string $class, string $prefix, string $path): string
-    {
-        $classPath = str_replace(
-            array($prefix, '\\',),
-            array($path . '/', '/'),
-            $class
-        );
-
-        $classPath .= '.php';
-
-        return $classPath;
     }
 }
