@@ -9,8 +9,10 @@ use RuntimeException;
  * Implementation of class autoloading for the Uwi Framework, corresponding to PSR-4
  * ------------------------------------------------------------------------------------
  *
- * @author Alexandr Shamanin <@slpAkkie>
  * @package uwi-loader
+ * @version 2.4.3
+ * @author  Alexandr Shamanin <@slpAkkie>
+ * @license MIT License
  *
  */
 final class Loader

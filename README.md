@@ -1,29 +1,21 @@
-# Uwi Loader
+# uwi-loader
 
-Реализация автозагрузчика классов PHP, в соответствии со спецификацией PSR-4
+Реализация автозагрузчика классов `PHP`, в соответствии со спецификацией `PSR-4`
 
 ## Использование
 
-Для подключения загрузчика в свой код, используте следующий пример:
+Для подключения загрузчика в свой код, воспользуйтесь следующим примером:
 
 ```php
 require_once __DIR__ . '/uwi-loader/Loader.php';
 
-Uwi\Loader::register();
-Uwi\Loader::fromJson(__DIR__ . '/Loader.json');
+// Загружаем псевдонимы, для коротких подключений
+Uwi\Loader\Loader::addAlias('Uwi', UWI_PATH);
+
+// Регистрируем загрузчик в качестве автозагрузчика классов
+Uwi\Loader\Loader::register();
 ```
 
-Пример файла конфигурации:
+## Версия
 
-```json
-{
-    "psr-4": {
-        "Acme\\Log\\Writer\\": "./acme-log-writer/lib/",
-        "Aura\\Web\\": "/path/to/aura-web/src/",
-        "Symfony\\Core\\": "./vendor/Symfony/Core/",
-        "Zend\\": [
-            "/usr/includes/Zend/"
-        ]
-    }
-}
-```
+`2.4.3`
